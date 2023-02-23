@@ -22,7 +22,7 @@
 
 from __future__ import absolute_import, unicode_literals
 
-import sys, urlparse
+import sys, urlparse, json
 import xbmcgui, xbmcplugin
 from urllib import urlencode, quote, unquote
 from . import tmdb, data_utils
@@ -103,22 +103,35 @@ def get_details(show_id):
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem(offscreen=True))
 
 
-def get_episode_list(show_id):  # pylint: disable=missing-docstring
+def get_episode_list(show_ids):  # pylint: disable=missing-docstring
     # type: (Text) -> None
-    logger.debug('Getting episode list for show id {}'.format(show_id))
-    if not show_id.isdigit():
+    try:
+        all_ids = json.loads(show_ids)
+        show_id = all_ids.get('tmdb')
+        if not show_id or not show_id.isdigit():
+            for key, value in all_ids.items():
+                show_id = str(data_utils._convert_ext_id(key, value))
+                if show_id:
+                    break
+            if not show_id:
+                show_id = str(show_ids)
+    except (ValueError, AttributeError):
+        show_id = str(show_ids)
+    if not show_id:
+        raise RuntimeError(
+            'No TMDb TV show id found in episode guide, this show should be refreshed or rescraped')
+    elif not show_id.isdigit():
         # Kodi has a bug: when a show directory contains an XML NFO file with
         # episodeguide URL, that URL is always passed here regardless of
         # the actual parsing result in get_show_from_nfo()
         parse_result, named_seasons = data_utils.parse_nfo_url(show_id)
-        if not parse_result:
-            return
-        if parse_result.provider == 'themoviedb' or parse_result.provider == 'tmdb':
-            show_info = tmdb.load_show_info(parse_result.show_id)
+        if parse_result:
+                show_id = parse_result.show_id
         else:
-            return
-    else:
-        show_info = tmdb.load_show_info(show_id)
+            raise RuntimeError(
+                'No TMDb TV show id found in episode guide, this show should be refreshed or rescraped')
+    logger.debug('Getting episode list for show id {}'.format(show_id))
+    show_info = tmdb.load_show_info(show_id)
     if show_info is not None:
         theindex = 0
         for episode in show_info['episodes']:
