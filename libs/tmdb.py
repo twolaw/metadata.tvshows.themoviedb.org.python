@@ -289,7 +289,7 @@ def load_fanarttv_art(show_info):
     """
     tvdb_id = show_info.get('external_ids', {}).get('tvdb_id')
     artwork_enabled = False
-    for artcheck in settings.FANARTTV_ART:
+    for artcheck in settings.FANARTTV_ART.values():
         artwork_enabled = artwork_enabled or artcheck
         if artwork_enabled:
             break
